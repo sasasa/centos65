@@ -2,36 +2,58 @@
 - hosts: 127.0.0.1
   become: yes
   vars:
-    - ruby_version: 2.2.2
+    - rails_root: /home/vagrant/share
+    - home_dir: /home/vagrant
+    - ruby_version: 2.3.1
+    - rails_version: 5.0.0
+
+  vars_prompt:
+    - name: appname
+      prompt: "Please enter your appname"
+      private: no
+      default: "myapp"
   tasks:
     - name: yum update
       yum: name=* state=latest
+
     - name: disable iptables
       service: name=iptables state=stopped enabled=no
+
+    - name: disable ip6tables
+      service: name=ip6tables state=stopped enabled=no
+
     - name: install libselinux-python
       yum: name=libselinux-python state=latest
+
     - name: remove localtime
       file: path=/etc/localtime state=absent
+
     - name: change timezone
       file: src=/usr/share/zoneinfo/Asia/Tokyo dest=/etc/localtime state=link force=yes mode=0644
+
     - name: change locale
       lineinfile: >-
         dest=/etc/sysconfig/i18n
         state=present
         regexp=^LANG=
         line='LANG="ja_JP.UTF-8"'
+
     - name: install remi repository
       command: rpm -Uvh --force http://rpms.famillecollet.com/enterprise/remi-release-6.rpm
+
     - name: install man
       yum: name=man state=latest
+
     - name: install apache
       yum: name=httpd state=latest
     - name: start apache and enabled
       service: name=httpd state=started enabled=yes
     - name: change owner
       file: dest=/var/www/html owner=vagrant recurse=yes
+
     - name: install gd-last
       yum: name=gd-last enablerepo=remi state=latest
+
     - name: install php
       yum: name={{item}} enablerepo=remi-php56 state=present
       with_items:
@@ -51,12 +73,36 @@
       copy: src=php.ini.custom dest=/etc/php.ini backup=yes
       notify:
         - restart apache
+
+    - name: install postgresql
+      yum: name=postgresql enablerepo=remi,epel state=present
+    - name: install postgresql-server
+      yum: name=postgresql-server enablerepo=remi,epel state=present
+    - name: start postgresql and enabled
+      service: name=postgresql state=started enabled=yes
+
     - name: install mysql
       yum: name=mysql-server enablerepo=remi,epel state=present
     - name: copy my.cnf.custom
       copy: src=my.cnf.custom dest=/etc/my.cnf backup=yes
     - name: start mysql and enabled
       service: name=mysqld state=started enabled=yes
+
+    - name: install wget
+      yum: name=wget enablerepo=remi,epel state=present
+ 
+    - name: install java-1.8.0-openjdk
+      yum: name=java-1.8.0-openjdk enablerepo=remi,epel state=present
+
+    - name: install jenkins repository
+      command: wget -O /etc/yum.repos.d/jenkins.repo http://pkg.jenkins-ci.org/redhat/jenkins.repo
+    - name: install jenkins key
+      command: rpm --import http://pkg.jenkins-ci.org/redhat/jenkins-ci.org.key
+    - name: install jenkins
+      yum: name=jenkins state=present
+    - name: start jenkins and enabled
+      service: name=jenkins state=started enabled=yes
+
     - name: install ruby dependencies
       yum: name={{item}} enablerepo=remi,epel state=present
       with_items:
@@ -79,6 +125,12 @@
         - libyaml-devel
         - libffi-devel
         - bison
+        - postgresql-devel
+        - mysql-devel
+        - libxml2
+        - libxslt
+        - libxml2-devel
+        - libxslt-devel
 
     - name: check rbenv installed
       command: test -x /home/vagrant/.rbenv
@@ -131,6 +183,68 @@
     - name: install nodejs
       yum: name=nodejs state=latest
       when: node_installed.rc != 0
+
+    - name: check gibo installed
+      shell: /bin/bash -lc "gibo"
+      register: gibo_installed
+      ignore_errors: yes
+      sudo: no
+
+    - name: install gibo
+      shell: /bin/bash -lc "cd {{home_dir}} && mkdir {{home_dir}}/bin && curl -L https://raw.github.com/simonwhitaker/gibo/master/gibo -so {{home_dir}}/bin/gibo && chmod +x {{home_dir}}/bin/gibo && gibo -u"
+      when: gibo_installed.rc != 0
+      sudo: no
+
+    - name: gem update
+      shell: /bin/bash -lc "rbenv exec gem update --system"
+      sudo: no
+
+    - name: check bundler installed
+      shell: /bin/bash -lc "bundle -v"
+      register: bundler_installed
+      ignore_errors: yes
+      sudo: no
+
+    - name: install bundler
+      shell: /bin/bash -lc "rbenv exec gem install bundler && rbenv rehash"
+      when: bundler_installed.rc != 0
+      sudo: no
+
+    - name: mkdir app dir
+      file: path={{home_dir}}/{{appname}} state=directory
+      sudo: no
+
+    - name: bundle init
+      shell: /bin/bash -lc "cd {{home_dir}}/{{appname}} && bundle init"
+      sudo: no
+
+    - name: Gemfile edit
+      sudo: no
+      lineinfile: >-
+        dest={{home_dir}}/{{appname}}/Gemfile
+        regexp='^# gem "rails"'
+        line='gem "rails", "{{ rails_version }}"'
+        insertafter='source "https://rubygems.org"'
+
+    - name: bundle install
+      shell: /bin/bash -lc "cd {{home_dir}}/{{appname}} && bundle install --path vendor/bundle"
+      sudo: no
+
+    - name: Gemfile delete
+      file: path={{home_dir}}/{{appname}}/Gemfile
+            state=absent
+
+    - name: Gemfile.lock delete
+      file: path={{home_dir}}/{{appname}}/Gemfile.lock
+            state=absent
+
+    - name: rails new T
+      shell: /bin/bash -lc "cd {{home_dir}}/{{appname}} && bundle exec rails new . -T"
+      sudo: no
+
+    - name: rails bundle install
+      shell: /bin/bash -lc "cd {{home_dir}}/{{appname}} && bundle install --path vendor/bundle"
+      sudo: no
 
   handlers:
     - name: restart apache
