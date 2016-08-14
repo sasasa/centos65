@@ -94,6 +94,9 @@
     - name: install java-1.8.0-openjdk
       yum: name=java-1.8.0-openjdk enablerepo=remi,epel state=present
 
+    - name: install java-1.8.0-openjdk-devel
+      yum: name=java-1.8.0-openjdk-devel enablerepo=remi,epel state=present
+
     - name: install jenkins repository
       command: wget -O /etc/yum.repos.d/jenkins.repo http://pkg.jenkins-ci.org/redhat/jenkins.repo
     - name: install jenkins key
@@ -245,6 +248,51 @@
     - name: rails bundle install
       shell: /bin/bash -lc "cd {{home_dir}}/{{appname}} && bundle install --path vendor/bundle"
       sudo: no
+
+    - name: install git dependencies
+      yum: name={{item}} enablerepo=remi,epel state=present
+      with_items:
+        - curl-devel
+        - expat-devel
+        - gettext-devel
+        - openssl-devel
+        - zlib-devel
+        - perl-ExtUtils-MakeMaker
+
+    - name: git down load
+      command: git clone git://git.kernel.org/pub/scm/git/git.git
+      args:
+        chdir: /usr/local/src/
+
+    - name: git update latest
+      shell: /bin/bash -lc "yum -y remove git && cd /usr/local/src/git && make prefix=/usr/local all && make prefix=/usr/local install"
+
+    - name: Symlink to Ruby for hub
+      file: path=/usr/bin/ruby
+            state=link
+            src={{home_dir}}/.rbenv/shims/ruby
+    - name: check hub installed
+      command: test -x ~/bin/hub
+      register: hub_present
+      ignore_errors: yes
+      become: no
+    - name: hub install
+      shell: /bin/bash -lc "curl http://hub.github.com/standalone -sLo ~/bin/hub && chmod +x ~/bin/hub"
+      sudo: no
+      when: hub_present.rc != 0
+
+    - name: install Xvfb dependencies for browser test
+      yum: name={{item}} enablerepo=remi,epel state=present
+      with_items:
+        - java-1.8.0-openjdk-devel
+        - firefox
+        - ipa-gothic-fonts
+        - ipa-pgothic-fonts
+        - ipa-mincho-fonts
+        - ipa-pmincho-fonts
+        - xorg-x11-server-Xvfb
+        - xwd
+        - netpbm-progs
 
   handlers:
     - name: restart apache
