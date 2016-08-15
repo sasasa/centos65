@@ -191,38 +191,38 @@
       shell: /bin/bash -lc "gibo"
       register: gibo_installed
       ignore_errors: yes
-      sudo: no
+      become: no
 
     - name: install gibo
       shell: /bin/bash -lc "cd {{home_dir}} && mkdir {{home_dir}}/bin && curl -L https://raw.github.com/simonwhitaker/gibo/master/gibo -so {{home_dir}}/bin/gibo && chmod +x {{home_dir}}/bin/gibo && gibo -u"
       when: gibo_installed.rc != 0
-      sudo: no
+      become: no
 
     - name: gem update
       shell: /bin/bash -lc "rbenv exec gem update --system"
-      sudo: no
+      become: no
 
     - name: check bundler installed
       shell: /bin/bash -lc "bundle -v"
       register: bundler_installed
       ignore_errors: yes
-      sudo: no
+      become: no
 
     - name: install bundler
       shell: /bin/bash -lc "rbenv exec gem install bundler && rbenv rehash"
       when: bundler_installed.rc != 0
-      sudo: no
+      become: no
 
     - name: mkdir app dir
       file: path={{home_dir}}/{{appname}} state=directory
-      sudo: no
+      become: no
 
     - name: bundle init
       shell: /bin/bash -lc "cd {{home_dir}}/{{appname}} && bundle init"
-      sudo: no
+      become: no
 
     - name: Gemfile edit
-      sudo: no
+      become: no
       lineinfile: >-
         dest={{home_dir}}/{{appname}}/Gemfile
         regexp='^# gem "rails"'
@@ -231,7 +231,7 @@
 
     - name: bundle install
       shell: /bin/bash -lc "cd {{home_dir}}/{{appname}} && bundle install --path vendor/bundle"
-      sudo: no
+      become: no
 
     - name: Gemfile delete
       file: path={{home_dir}}/{{appname}}/Gemfile
@@ -243,11 +243,11 @@
 
     - name: rails new T
       shell: /bin/bash -lc "cd {{home_dir}}/{{appname}} && bundle exec rails new . -T"
-      sudo: no
+      become: no
 
     - name: rails bundle install
       shell: /bin/bash -lc "cd {{home_dir}}/{{appname}} && bundle install --path vendor/bundle"
-      sudo: no
+      become: no
 
     - name: install git dependencies
       yum: name={{item}} enablerepo=remi,epel state=present
@@ -278,8 +278,19 @@
       become: no
     - name: hub install
       shell: /bin/bash -lc "curl http://hub.github.com/standalone -sLo ~/bin/hub && chmod +x ~/bin/hub"
-      sudo: no
+      become: no
       when: hub_present.rc != 0
+
+    - name: heroku install
+      shell: wget -O- https://toolbelt.heroku.com/install.sh | sh
+
+    - name: copy backup.sh
+      copy: src=backup.sh dest={{home_dir}}/bin/backup.sh
+      become: no
+    - name: cron set up
+      shell: crontab cron.conf
+      become: no
+
 
     - name: install Xvfb dependencies for browser test
       yum: name={{item}} enablerepo=remi,epel state=present
@@ -293,6 +304,7 @@
         - xorg-x11-server-Xvfb
         - xwd
         - netpbm-progs
+        - qt5-qtwebkit-devel
 
   handlers:
     - name: restart apache
