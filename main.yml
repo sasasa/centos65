@@ -74,12 +74,19 @@
       notify:
         - restart apache
 
-    - name: install postgresql
-      yum: name=postgresql enablerepo=remi,epel state=present
-    - name: install postgresql-server
-      yum: name=postgresql-server enablerepo=remi,epel state=present
-    - name: start postgresql and enabled
-      service: name=postgresql state=started enabled=yes
+    - name: repos postgresql95 install
+      command: yum -y localinstall https://download.postgresql.org/pub/repos/yum/9.5/redhat/rhel-6-i386/pgdg-centos95-9.5-2.noarch.rpm
+    - name: install postgresql95-server
+      yum: name={{item}} enablerepo=remi,epel state=present
+      with_items:
+        - postgresql95-server
+        - postgresql95-devel
+        - postgresql95-contrib
+    - name: postgresql-9.5 initdb
+      shell: /etc/init.d/postgresql-9.5 initdb
+    - name: start postgresql-9.5 and enabled
+      service: name=postgresql-9.5 state=started enabled=yes
+      ignore_errors: yes
 
     - name: install mysql
       yum: name=mysql-server enablerepo=remi,epel state=present
@@ -128,12 +135,14 @@
         - libyaml-devel
         - libffi-devel
         - bison
-        - postgresql-devel
+        - libssl-dev
         - mysql-devel
         - libxml2
         - libxslt
         - libxml2-devel
         - libxslt-devel
+        - libevent-devel
+        - libevent-headers
 
     - name: check rbenv installed
       command: test -x /home/vagrant/.rbenv
@@ -305,6 +314,13 @@
         - xwd
         - netpbm-progs
         - qt5-qtwebkit-devel
+
+    - name: repos phantomjs install
+      command: yum -y localinstall http://repo.okay.com.mx/centos/6/i386/release/okay-release-1-1.noarch.rpm
+    - name: install phantomjs
+      yum: name={{item}} enablerepo=remi,epel state=present
+      with_items:
+        - phantomjs
 
   handlers:
     - name: restart apache
