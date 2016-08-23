@@ -5,9 +5,35 @@ if [ -f ~/.bashrc ]; then
         . ~/.bashrc
 fi
 
+#peco‚ÌÝ’è
+export HISTCONTROL="ignoredups"
+peco-chosen-history() {
+  local HIST_NUM=$(history | wc -l)
+  local HIST_FIRST=$((-1*(HIST_NUM-1)))
+
+  if [ $HIST_FIRST -eq 0 ] ; then
+    history -d $((HISTCMD-1))
+    echo "No history" >&2
+    return
+  fi
+
+  local CHOSEN_CMD=$(fc -l $HIST_FIRST | sort -k 2 -k 1nr | uniq -f 1 | sort -nr | sed -E 's/^[0-9]+[[:blank:]]+//' | peco | head -n 1)
+
+  if [ -n "$CHOSEN_CMD" ] ; then
+    history -s $CHOSEN_CMD
+
+    #if type osascript > /dev/null 2>&1 ; then
+    #  (osascript -e 'tell application "System Events" to keystroke (ASCII character 30)' &)
+    #fi  
+  else
+    history -d $((HISTCMD-1))
+  fi  
+}
+bind -x '"\C-r":peco-chosen-history'
 # User specific environment and startup programs
 
-export PATH
+export GOPATH=/usr/share/gocode
+export PATH=$PATH:$GOPATH/bin
 export PATH=$PATH:$HOME/bin
 export PATH="/usr/local/heroku/bin:$PATH"
 export PATH="$HOME/.rbenv/bin:$PATH"
@@ -18,6 +44,7 @@ export DISPLAY=:1
 
 eval "$(rbenv init -)"
 eval "$(hub alias -s)"
+eval "$(direnv hook bash)"
 source /usr/local/src/git/contrib/completion/git-prompt.sh
 source /usr/local/src/git/contrib/completion/git-completion.bash
 GIT_PS1_SHOWDIRTYSTATE=true

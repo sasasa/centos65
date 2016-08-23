@@ -6,7 +6,8 @@
     - home_dir: /home/vagrant
     - ruby_version: 2.3.1
     - rails_version: 5.0.0
-
+    - app_db: mysql
+      # or postgresql
   vars_prompt:
     - name: appname
       prompt: "Please enter your appname"
@@ -97,7 +98,7 @@
 
     - name: install wget
       yum: name=wget enablerepo=remi,epel state=present
- 
+
     - name: install java-1.8.0-openjdk
       yum: name=java-1.8.0-openjdk enablerepo=remi,epel state=present
 
@@ -143,6 +144,9 @@
         - libxslt-devel
         - libevent-devel
         - libevent-headers
+        - nkf
+        - graphviz
+        - graphviz-gd
 
     - name: check rbenv installed
       command: test -x /home/vagrant/.rbenv
@@ -250,8 +254,8 @@
       file: path={{home_dir}}/{{appname}}/Gemfile.lock
             state=absent
 
-    - name: rails new T
-      shell: /bin/bash -lc "cd {{home_dir}}/{{appname}} && bundle exec rails new . -T"
+    - name: rails new from template
+      shell: /bin/bash -lc "cd {{home_dir}} && bundle exec rails new {{appname}} --database={{app_db}} --skip-test-unit --skip-bundle -m https://raw.githubusercontent.com/morizyun/rails5_application_template/master/app_template.rb"
       become: no
 
     - name: rails bundle install
@@ -321,6 +325,20 @@
       yum: name={{item}} enablerepo=remi,epel state=present
       with_items:
         - phantomjs
+
+    - name: install Dev tool
+      yum: name={{item}} enablerepo=remi,epel state=present
+      with_items:
+        - the_silver_searcher
+        - tmux
+        - vim-enhanced
+        - golang
+
+    - name: Dev tool direnv install
+      shell: go get github.com/peco/peco/cmd/peco
+
+    - name: Dev tool direnv install
+      shell: /bin/bash -lc "cd {{home_dir}} && git clone http://github.com/zimbatm/direnv && cd {{home_dir}}/direnv && sudo make install"
 
   handlers:
     - name: restart apache
