@@ -5,35 +5,107 @@ if [ -f ~/.bashrc ]; then
         . ~/.bashrc
 fi
 
-#peco�̐ݒ�
-export HISTCONTROL="ignoredups"
-peco-chosen-history() {
-  local HIST_NUM=$(history | wc -l)
-  local HIST_FIRST=$((-1*(HIST_NUM-1)))
+#pecoの設定
+if [ -x "`which peco`" ]; then
+alias lsp='ls -la | peco'
+alias psp='ps aux | peco'
 
-  if [ $HIST_FIRST -eq 0 ] ; then
+export EDITOR="vim"
+export HISTCONTROL="ignoredups"
+
+function vils(){
+  local pre_work_dir=`pwd`
+  if [ -d "$1" ]; then
+    cd "$1"
+    echo "$1 に移動中..."
+  fi
+  if [ -f "$1" ]; then
+    echo "$1 を表示中..."
+    $EDITOR "$1"
+    return 0
+  fi
+  while :
+  do
+    local dir="$(ls -al | peco | awk '{print $10}')"
+    if [ -d "$dir" ]; then
+      cd "$dir"
+      echo "$dir に移動中..."
+    elif [ -f "$dir" ]; then
+      echo "$dir を表示中..."
+      $EDITOR "$dir"
+      break
+    elif [ -n "$dir" ]; then
+      echo "$dir を表示中..."
+      $EDITOR -p $dir
+      break
+    else
+      break
+    fi
+  done
+  echo "表示終了"
+  cd "$pre_work_dir"
+}
+
+function peco-history() {
+  local NUM=$(history | wc -l)
+  local FIRST=$((-1*(NUM-1)))
+
+  if [ $FIRST -eq 0 ] ; then
     history -d $((HISTCMD-1))
     echo "No history" >&2
     return
   fi
 
-  local CHOSEN_CMD=$(fc -l $HIST_FIRST | sort -k 2 -k 1nr | uniq -f 1 | sort -nr | sed -E 's/^[0-9]+[[:blank:]]+//' | peco | head -n 1)
+  local CMD=$(fc -l $FIRST | sort -k 2 -k 1nr | uniq -f 1 | sort -nr | sed -E 's/^[0-9]+[[:blank:]]+//' | peco | head -n 1)
 
-  if [ -n "$CHOSEN_CMD" ] ; then
-    history -s $CHOSEN_CMD
+  if [ -n "$CMD" ] ; then
+    history -s $CMD
 
     #if type osascript > /dev/null 2>&1 ; then
-    #  (osascript -e 'tell application "System Events" to keystroke (ASCII character 30)' &)
-    #fi  
+    #    (osascript -e 'tell application "System Events" to keystroke (ASCII character 30)' &)
+    #fi
   else
     history -d $((HISTCMD-1))
-  fi  
+  fi
 }
-bind -x '"\C-r":peco-chosen-history'
+bind -x '"\C-r":peco-history'
+
+function peco-kill-process () {
+  local pid=$(psp | awk '{ print $2 }')
+  if [ ${#pid} -ne 0 ]; then
+    sudo kill $pid;
+    echo "Killed process ${pid}"
+  else
+    echo "Not killed process ${pid}"
+  fi
+}
+bind -x '"\C-k":peco-kill-process'
+
+if [ -x "`which ag`" ]; then
+function viag() {
+  local P=$(ag $@ | peco --query "$LBUFFER" | awk -F: '{print "-c " $2 " -p " $1}')
+  if [ ${#P} -ne 0 ]; then
+    $EDITOR $P;
+  fi
+}
+fi
+if [ -x "`which git`" ]; then
+function vigit() {
+  local P=$(git grep -n $1 | peco | awk -F: '{print "-c "$2" -p "$1}')
+  if [ ${#P} -ne 0 ]; then
+    $EDITOR $P;
+  fi
+}
+fi
+fi
+
 # User specific environment and startup programs
 
+if [ -x "`which go`" ]; then
 export GOPATH=/usr/share/gocode
 export PATH=$PATH:$GOPATH/bin
+fi
+
 export PATH=$PATH:$HOME/bin
 export PATH="/usr/local/heroku/bin:$PATH"
 export PATH="$HOME/.rbenv/bin:$PATH"

@@ -334,9 +334,17 @@
         - vim-enhanced
         - golang
 
-    - name: Dev tool direnv install
-      shell: go get github.com/peco/peco/cmd/peco
+    - name: Dev tool peco install
+      shell: |
+        go get github.com/peco/peco/cmd/peco
+        go get github.com/koron/gomigemo/cmd/gmigemo
+        go get github.com/peco/migemogrep
 
+    - name: Dev tool peco setup
+      shell: |
+        mkdir {{home_dir}}/.peco
+
+      become: no
     - name: Dev tool direnv install
       shell: /bin/bash -lc "cd {{home_dir}} && git clone http://github.com/zimbatm/direnv && cd {{home_dir}}/direnv && sudo make install"
 
